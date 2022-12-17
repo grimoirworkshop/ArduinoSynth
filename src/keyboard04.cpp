@@ -6,7 +6,8 @@
 //  yet to implement:
 //  pitch bend
 //  cv out
-//  record and play sequences, ideally to external clock
+//  record and play sequences, ideally to external clock, should probably do as interrupt
+
 
 // for prpgramm to know if its starting new sound or shifting from note to note
 bool NotPlaying;
