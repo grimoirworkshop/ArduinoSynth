@@ -1,0 +1,7 @@
+based on keyboard of elka electric organ with 7x8 scanning matrix currently runs on Nano, but for full functionality it will need esp32 i suppose
+
+ideally it should: -be synced to external clock or provide its own -provide cv and gate for monophonic output to be used in modular synth; -record monophonic sequences and play them when in other modes; -provide cv's and gates for polyphonic synth -record and play them as well -polyphonic synth is yet to be designed and built -send and recive MIDI -all analogue controls e.g. pitch shift should be controllable by cv and be able to provide cv for other modules
+
+14/12/22 version 0.4 mostly finished monophonic part without sequencing it outputs square wave to digital pin. later it should be adapted to be cv, most probably by using pwm or inbuilt DAC of Mega
+
+next is to tackle the polyphonic
