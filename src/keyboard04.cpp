@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Controlino.h>
+#include <math.h>
 //  thats basic functionality for monophonyc keyboard
 //  it supports portamento as chromatic and linear with variable resolution to avchieve arpeggiated effects
 //  it supports octave shifts from default you can move one oct down or two up
@@ -11,6 +12,7 @@
 
 // for prpgramm to know if its starting new sound or shifting from note to note
 bool NotPlaying;
+uint16_t Keys[79];
 
 // Setting the pins for scanning matrix
 uint8_t OutPins[] = {8, 7, 6, 5, 4, 3, 2};
@@ -18,8 +20,7 @@ uint8_t InPins[] = {9, 10, 11, 12, 14, 15, 16, 17};
 const int OutPin = 13;
 // Array Keys stores frequency values for keys. values are calculetd during setup;
 //  A 440 Hz is [45]
-uint8_t Keys[83];
-bool Buttons[11];
+
 
 // Octave shift; range 0 -3
 uint8_t OctaveShift = 1;
@@ -48,12 +49,17 @@ unsigned long PortaStart;
 
 unsigned long CurrentTime;
 
-//this class plays without 
+//this class plays without portamento
 class monoPlayer{
     protected: 
         static  float currentFr;
         bool isSilent;
     public:
+        monoPlayer(){
+            isSilent = true;
+            playFromMIDI = false;
+            sendMIDI = false;
+        };
         bool playFromMIDI;
         bool sendMIDI;        
         uint8_t MIDIchannel;
@@ -90,7 +96,7 @@ void ReadLoop()
 
                 if (NumKeysPressed < 8)
                 {
-                    KeysPressed[NumKeysPressed] = 24 + ButtonNo + (12 * OctaveShift); // +24 to make it as im MIDI so [0;5] is leftmost key and it is F1
+                    KeysPressed[NumKeysPressed] = 24 + ButtonNo + (12 * OctaveShift); // +24 to make it as im MIDI so [0;5]  (leftmost key)  is F1 (MIDI 29)
                 }
                 NumKeysPressed++;
             }
@@ -301,45 +307,10 @@ void PortamentoMono()
 void SetTheFreq()
 {
     int i;
-    Keys[5] = 44;
-    Keys[6] = 46;
-    Keys[7] = 49;
-    Keys[8] = 52;
-    Keys[9] = 55;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 10] = int(Keys[i + 9] * 1.05946);
-    }
-    Keys[21] = 110;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 22] = int(Keys[i + 21] * 1.05946);
-    }
-    Keys[33] = 220;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 34] = int(Keys[i + 33] * 1.05946);
-    }
-    Keys[45] = 440;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 46] = int(Keys[i + 45] * 1.05946);
-    }
-    Keys[57] = 880;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 58] = int(Keys[i + 57] * 1.05946);
-    }
-    Keys[69] = 1760;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 70] = int(Keys[i + 69] * 1.05946);
-    }
-    Keys[81] = 3520;
-    for (i = 0; i < 11; i++)
-    {
-        Keys[i + 82] = int(Keys[i + 81] * 1.05946);
-    }
+    for (i=29; i<sizeof(Keys); i++){
+        Keys[i] =round(440.0 * pow(float(i), ((float(i)-69)/12)));
+        Serial.println(Keys[i]);
+    };    
 }
 
 void setup()
@@ -361,6 +332,8 @@ void setup()
 
     NotPlaying = true;
     NumKeysPressed = 0;
+
+    pKeys = Keys;
 
     // calculate values for Keys[]
     SetTheFreq();
