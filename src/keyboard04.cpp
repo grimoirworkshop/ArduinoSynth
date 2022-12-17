@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Controlino.h>
 //  thats basic functionality for monophonyc keyboard
 //  it supports portamento as chromatic and linear with variable resolution to avchieve arpeggiated effects
 //  it supports octave shifts from default you can move one oct down or two up
@@ -7,7 +8,6 @@
 //  pitch bend
 //  cv out
 //  record and play sequences, ideally to external clock, should probably do as interrupt
-
 
 // for prpgramm to know if its starting new sound or shifting from note to note
 bool NotPlaying;
@@ -18,7 +18,8 @@ uint8_t InPins[] = {9, 10, 11, 12, 14, 15, 16, 17};
 const int OutPin = 13;
 // Array Keys stores frequency values for keys. values are calculetd during setup;
 //  A 440 Hz is [45]
-int Keys[83];
+uint8_t Keys[83];
+bool Buttons[11];
 
 // Octave shift; range 0 -3
 uint8_t OctaveShift = 1;
@@ -27,8 +28,7 @@ uint8_t OctaveShift = 1;
 uint8_t KeyPlayed, KeyToPlay, NumKeysPressed, PNumKeysPressed, ChrPortaKey;
 
 int GoalFr;
-// we use int in tone(), but calculate in float to minimize error
-float CurrentFr;
+
 
 // Arrays that store all keys pressed in current and previous reading, empty array elements are zeros. PKeysPressed has keys sorted in it chronologically, with most recent key having greater index
 int KeysPressed[8], PKeysPressed[8];
@@ -48,6 +48,25 @@ unsigned long PortaStart;
 
 unsigned long CurrentTime;
 
+//this class plays without 
+class monoPlayer{
+    protected: 
+        static  float currentFr;
+        bool isSilent;
+    public:
+        bool playFromMIDI;
+        bool sendMIDI;        
+        uint8_t MIDIchannel;
+        virtual void playTheKey(uint8_t key, float bend){
+            currentFr = (Keys[KeyToPlay])*bend;
+            isSilent = false;
+            tone(OutPin, int(currentFr));
+        }; 
+        //should be able to send here MIDI note as well in the future
+        void stop(){
+            noTone(OutPin);
+        };        
+};
 
 
 // reads out the matrix and stores it to KeysPressed[]
@@ -71,7 +90,7 @@ void ReadLoop()
 
                 if (NumKeysPressed < 8)
                 {
-                    KeysPressed[NumKeysPressed] = ButtonNo + (12 * OctaveShift);
+                    KeysPressed[NumKeysPressed] = 24 + ButtonNo + (12 * OctaveShift); // +24 to make it as im MIDI so [0;5] is leftmost key and it is F1
                 }
                 NumKeysPressed++;
             }
@@ -122,6 +141,22 @@ void ReArrange()
         PKeysPressed[i] = Array[i];
     }
 }
+void ChromPorta()
+{
+    if (abs(KeyToPlay - KeyPlayed) == 1)
+    {
+        Step = 0;
+        tone(OutPin, Keys[KeyToPlay]);
+        currentFr = Keys[KeyToPlay];
+    }
+    else
+    {
+        ChrPortaKey = KeyPlayed;
+        PortaRes = abs(Portamento / (KeyToPlay - KeyPlayed));
+        // only to assign a sign to Step
+        Step = Keys[KeyToPlay] - Keys[KeyPlayed];
+    }
+}
 // Plays the keys and sets up values for use in PortamentoMono()
 void SetPlayMono()
 {
@@ -132,7 +167,7 @@ void SetPlayMono()
             NotPlaying = false;
             KeyPlayed = KeyToPlay;
             tone(OutPin, Keys[KeyPlayed]);
-            CurrentFr = Keys[KeyPlayed];
+            currentFr = Keys[KeyPlayed];
             Step = 0;
         }
         else if (NumKeysPressed == 1)
@@ -144,19 +179,7 @@ void SetPlayMono()
                     PortaStart = millis();
                     if (ChrPorta)
                     {
-                        if (abs(KeyToPlay - KeyPlayed) == 1)
-                        {
-                            Step = 0;
-                            tone(OutPin, Keys[KeyToPlay]);
-                            CurrentFr = Keys[KeyToPlay];
-                        }
-                        else
-                        {
-                            ChrPortaKey = KeyPlayed;
-                            PortaRes = abs(Portamento / (KeyToPlay - KeyPlayed));
-                            // only to assign a sign to Step
-                            Step = Keys[KeyToPlay] - Keys[KeyPlayed];
-                        }
+                        ChromPorta();
                     }
                     else
                     {
@@ -167,7 +190,7 @@ void SetPlayMono()
                 {
                     Step = 0;
                     tone(OutPin, Keys[KeyToPlay]);
-                    CurrentFr = Keys[KeyToPlay];
+                    currentFr = Keys[KeyToPlay];
                 }
                 KeyPlayed = KeyToPlay;
             }
@@ -179,19 +202,7 @@ void SetPlayMono()
                 PortaStart = millis();
                 if (ChrPorta)
                 {
-                    if (abs(KeyToPlay - KeyPlayed) == 1)
-                    {
-                        Step = 0;
-                        tone(OutPin, Keys[KeyToPlay]);
-                        CurrentFr = Keys[KeyToPlay];
-                    }
-                    else
-                    {
-                        ChrPortaKey = KeyPlayed;
-                        PortaRes = abs(Portamento / (KeyToPlay - KeyPlayed));
-                        // only to assign a sign to Step
-                        Step = Keys[KeyToPlay] - Keys[KeyPlayed];
-                    }
+                    ChromPorta();
                 }
                 else
                 {
@@ -202,7 +213,7 @@ void SetPlayMono()
             {
                 Step = 0;
                 tone(OutPin, Keys[KeyToPlay]);
-                CurrentFr = Keys[KeyToPlay];
+                currentFr = Keys[KeyToPlay];
             }
             KeyPlayed = KeyToPlay;
         }
@@ -211,7 +222,7 @@ void SetPlayMono()
     {
         noTone(OutPin);
         NotPlaying = true;
-        CurrentFr = 0;
+        currentFr = 0;
         Step = 0;
     }
 }
@@ -221,7 +232,7 @@ void PortamentoMono()
     if (!NotPlaying)
     {
         int TimeDif = millis() - PortaStart;
-        if ((Keys[KeyPlayed] != CurrentFr) && (TimeDif >= PortaRes))
+        if ((Keys[KeyPlayed] != currentFr) && (TimeDif >= PortaRes))
         {
             if (Step > 0)
             {
@@ -229,27 +240,27 @@ void PortamentoMono()
                 {
                     ChrPortaKey++;
                     PortaStart = millis();
-                    CurrentFr = Keys[ChrPortaKey];
+                    currentFr = Keys[ChrPortaKey];
                     if (ChrPortaKey == KeyPlayed)
                     {
                         Step = 0;
                     }
-                    tone(OutPin, int(CurrentFr));
+                    tone(OutPin, int(currentFr));
                 }
-                else if (CurrentFr > Keys[KeyPlayed])
+                else if (currentFr > Keys[KeyPlayed])
                 {
-                    CurrentFr = Keys[KeyPlayed];
-                    tone(OutPin, int(CurrentFr));
+                    currentFr = Keys[KeyPlayed];
+                    tone(OutPin, int(currentFr));
                 }
                 else
                 {
-                    CurrentFr = CurrentFr + (Step * TimeDif);
+                    currentFr = currentFr + (Step * TimeDif);
                     PortaStart = millis();
-                    tone(OutPin, int(CurrentFr));
-                    if (CurrentFr > Keys[KeyPlayed])
+                    tone(OutPin, int(currentFr));
+                    if (currentFr > Keys[KeyPlayed])
                     {
-                        CurrentFr = Keys[KeyPlayed];
-                        tone(OutPin, int(CurrentFr));
+                        currentFr = Keys[KeyPlayed];
+                        tone(OutPin, int(currentFr));
                     }
                 }
             }
@@ -259,27 +270,27 @@ void PortamentoMono()
                 {
                     ChrPortaKey--;
                     PortaStart = millis();
-                    CurrentFr = Keys[ChrPortaKey];
+                    currentFr = Keys[ChrPortaKey];
                     if (ChrPortaKey == KeyPlayed)
                     {
                         Step = 0;
                     }
-                    tone(OutPin, int(CurrentFr));
+                    tone(OutPin, int(currentFr));
                 }
-                else if (CurrentFr < Keys[KeyPlayed])
+                else if (currentFr < Keys[KeyPlayed])
                 {
-                    CurrentFr = Keys[KeyPlayed];
-                    tone(OutPin, int(CurrentFr));
+                    currentFr = Keys[KeyPlayed];
+                    tone(OutPin, int(currentFr));
                 }
                 else
                 {
-                    CurrentFr = CurrentFr + (Step * TimeDif);
+                    currentFr = currentFr + (Step * TimeDif);
                     PortaStart = millis();
-                    tone(OutPin, int(CurrentFr));
-                    if (CurrentFr < Keys[KeyPlayed])
+                    tone(OutPin, int(currentFr));
+                    if (currentFr < Keys[KeyPlayed])
                     {
-                        CurrentFr = Keys[KeyPlayed];
-                        tone(OutPin, int(CurrentFr));
+                        currentFr = Keys[KeyPlayed];
+                        tone(OutPin, int(currentFr));
                     }
                 }
             }
