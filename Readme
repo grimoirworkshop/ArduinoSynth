@@ -5,3 +5,5 @@ ideally it should: -be synced to external clock or provide its own -provide cv a
 14/12/22 version 0.4 mostly finished monophonic part without sequencing it outputs square wave to digital pin. later it should be adapted to be cv, most probably by using pwm or inbuilt DAC of Mega
 
 next is to tackle the polyphonic
+16/12/22 
+polyphonic will wait for now as i optimise what is already written
