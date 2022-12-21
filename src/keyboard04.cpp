@@ -124,6 +124,6 @@ void setup()
 void loop()
 {
     ReadLoop();
-    pMonoPlayer->tick();
+    pMonoPlayer->portamentoTick();
 }
 

@@ -6,6 +6,7 @@ private:
     float currentFr;
     uint16_t goalFr;
     uint8_t keyPlayed;
+    uint8_t currentKey; // thats for use in chromatic portamento
     float step;
     unsigned long portamentoPrevTime;
     enum
@@ -15,15 +16,16 @@ private:
         inPortameno,
         inChrPortamento
     } states;
-    uint8_t portamento;
+    uint16_t portamento;
     uint8_t portamentoTickTime;
     bool chromaticPortamento;
     bool playFromMIDI;
     bool sendMIDI;
     uint8_t MIDIchannel;
     uint8_t keysPressed[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    float bend;
-    uint16_t frequencyCalc(uint8_t key){
+
+    uint16_t frequencyCalc(uint8_t key)
+    {
         return int(440.0 * pow(2.0, ((double(key) - 69) / 12)));
     }
 
@@ -33,43 +35,44 @@ public:
         step = 0.0;
         playFromMIDI = false;
         sendMIDI = false;
-        portamento = 0;
-        portamentoTickTime = 1;
-        chromaticPortamento = false;
+        portamento = 3000;
+        portamentoTickTime = 50;
+        chromaticPortamento = true;
 
         states = silent;
-        bend = 1.0;
     };
-    void onNewKey(uint8_t key)
+
+    void onNewKey(uint8_t key, float bend)
     {
-        goalFr = frequencyCalc(key) * bend;
+        goalFr = frequencyCalc(key);
         switch (states)
         {
         case silent:
-            noteOn(key);
+            noteOn(key, bend);
             break;
         default:
-            if (portamento == 0)
-            {
-                noteOn(key);
-                break;
-            }
-            else{
-               if (chromaticPortamento){
-                    setChromaticPortamento(key);
-                }
-                else {
-                    setPortamento(key);
-                } 
-            }
 
+            if (portamento != 0)
+            {
+                if (chromaticPortamento)
+                {
+                    setChromaticPortamento(key);
+                    break;
+                }
+                else
+                {
+                    setPortamento(key);
+                    break;
+                }
+            }
+            noteOn(key, bend);
             break;
         }
     }
     void onKeyPress(uint8_t key)
     {
         addToArray(key);
-        onNewKey(key);
+        onNewKey(key, 1.0);
     }
     void addToArray(uint8_t key)
     {
@@ -124,7 +127,7 @@ public:
             {
                 if (keysPressed[i] != 0)
                 {
-                    onNewKey(keysPressed[i]);
+                    onNewKey(keysPressed[i], 1.0);
                     break;
                 }
             }
@@ -132,14 +135,22 @@ public:
     }
     void setPortamento(uint8_t key)
     {
-        
+        step = (goalFr - currentFr) / portamento;
+        portamentoPrevTime = millis();
+        states = inPortameno;
+        keyPlayed = key;
     }
     void setChromaticPortamento(uint8_t key)
     {
-
+        states = inChrPortamento;
+        portamentoTickTime = abs(portamento / (key - keyPlayed));
+        currentKey = keyPlayed;
+        keyPlayed = key;
+        portamentoPrevTime = millis();
     }
-    void noteOn(uint8_t key)
+    void noteOn(uint8_t key, float bend)
     {
+        goalFr *= bend;
         tone(outputPin, goalFr);
         currentFr = goalFr;
         states = noteOnHold;
@@ -150,32 +161,50 @@ public:
         noTone(outputPin);
         states = silent;
     };
-    void tick()
+    void portamentoTick()
     {
-        if (needToTick(portamentoPrevTime)){
-        switch (states)
+        int timePassed = millis() - portamentoPrevTime;
+        if (needToTick(timePassed))
         {
-        case inChrPortamento:
-            
-            break;
-        case inPortameno:
-            
-            break;
-        default:
-            break;
-        }
+            portamentoPrevTime = millis();
+            switch (states)
+            {
+            case inChrPortamento:
+                currentKey = ((currentKey>keyPlayed)?(currentKey-1):(currentKey+1));
+                if (currentKey == keyPlayed)
+                {
+                    states = noteOnHold;
+                }
+                currentFr = frequencyCalc(currentKey);
+                tone(outputPin, currentFr);
+                
+                break;
+            case inPortameno:
+                currentFr += step * timePassed;
+                if ((goalFr - currentFr) / step > 1)
+                {
+                    tone(outputPin, int(currentFr));
+                    
+                    break;
+                }
+                states = noteOnHold;
+                currentFr = goalFr;
+                tone(outputPin, int(currentFr));
+                break;
+            default:
+                break;
+            }
         }
     }
-    bool needToTick(unsigned long portaPreviousTime)
+    bool needToTick(int passedTime)
     {
-        if ((millis() - portaPreviousTime) >= portamentoTickTime)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return ((passedTime >= portamentoTickTime) ? true : false);
     };
-
+    void onBendChange(float bend)
+    {
+        if (states == noteOnHold)
+        {
+            noteOn(keyPlayed, bend);
+        }
+    }
 };
