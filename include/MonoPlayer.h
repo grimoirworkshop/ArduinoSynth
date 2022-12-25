@@ -38,10 +38,10 @@ public:
         portamento = 0;
         portamentoTickTime = 50;
         chromaticPortamento = false;
-
+        
         states = silent;
     };
-
+    
     void onNewKey(uint8_t key, float bend)
     {
         goalFr = frequencyCalc(key);
@@ -71,8 +71,8 @@ public:
     }
     void onKeyPress(uint8_t key)
     {
-        addToArray(key);
-        onNewKey(key, 1.0);
+        addToArray(key + 12*(octaveShift+2));
+        onNewKey(key+12*(octaveShift+2), 1.0);
     }
     void addToArray(uint8_t key)
     {
@@ -207,9 +207,7 @@ public:
     {
         return (passedTime >= portamentoTickTime);
     };
-    uint8_t onSequenserWrite(uint8_t i){
-        return keysPressed[i];
-    }
+    
     void onBendChange(float bend)
     {
         if (states == noteOnHold)

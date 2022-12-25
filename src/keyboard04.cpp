@@ -1,6 +1,14 @@
 #include <Arduino.h>
+#include <OneButton.h>
 
 #include <math.h>
+
+#define DEBUG 1
+#if DEBUG == 1
+#define debug(x) Serial.println(x)
+#else
+#define debug(x)
+#endif 
 
 //  thats basic functionality for monophonyc keyboard
 //  it supports portamento as chromatic and linear with variable resolution to avchieve arpeggiated effects
@@ -37,39 +45,14 @@ unsigned long currentTime;
 
 // this class plays without portamento
 #include <MonoPlayer.h>
-MonoPlayer *pMonoPlayer = new MonoPlayer();
-class PianoKey
-{
-private:
-    bool wasOn;
 
-public:
-    PianoKey()
-    {
-        wasOn = false;
-    }
-    void tick(bool trigger, uint8_t arg)
-    {
-        if (trigger)
-        {
-            if (!wasOn)
-            {
-                pMonoPlayer->onKeyPress(arg);
-                wasOn = true;
-                Serial.print("on ");
-                Serial.println(arg);
-            }
-        }
-        else if (wasOn)
-        {
-            pMonoPlayer->onKeyRelease(arg);
-            wasOn = false;
-            Serial.print("off ");
-                Serial.println(arg);
-        }
-    };
-};
-PianoKey *keys =  new PianoKey[44];
+#include <SequencerMono.h>
+MonoPlayer *pMonoPlayer = new MonoPlayer();
+
+
+
+
+OneButton keys[44];
 
 // MonoPlayer pMonoPlayer;
 //  reads out the matrix and stores it to keysPressed[]
@@ -83,27 +66,24 @@ void ReadLoop()
         for (uint8_t j = 0; j < 8; j++)
         {
             uint8_t key = i * 8 + j;
-            if ((key > 4) && (key < 50)){
-                keys[key].tick((digitalRead(inPins[j]) == LOW), key+24+octaveShift*12);
-                
-            }    
+            keys[key].tick();
+            debug("tick");
         }
         digitalWrite(outPins[i], HIGH);
     }
 }
-/*
-void setTheFreq()
-{
-    for (uint8_t i = 29; i < 97; i++)
-    {
-        frequencyChart[i] = int(440.0 * pow(2.0, ((double(i) - 69) / 12)));
-        Serial.println(frequencyChart[i]);
-    };
-}*/
 
+void _OnKeyPress(void   * arg){
+    pMonoPlayer->onKeyPress(*(uint8_t*)arg);
+}
+void _OnKeyRelease(void   * arg){
+    pMonoPlayer->onKeyRelease(*(uint8_t*)arg);
+}
 void setup()
-{
+{   
     Serial.begin(9600);
+    Serial.print("hawooo   ");
+    debug("Started setup");
     pinMode(outputPin, OUTPUT);
     digitalWrite(outputPin, LOW);
    
@@ -117,9 +97,26 @@ void setup()
     {
         pinMode(inPins[i], INPUT_PULLUP);
     }
+    for (uint8_t i = 0; i < 7; i++)
+    {
+        
+        for (uint8_t j = 0; j < 8; j++)
+        {
+            uint8_t key = i * 8 + j;
+            keys[key] = OneButton(j, true, true);
 
-    // calculate values for frequencyChart[]
-    //setTheFreq();
+            keys[key].attachLongPressStart( _OnKeyPress, &key);
+            keys[key].attachLongPressStop( _OnKeyRelease, &key);
+            keys[key].setPressTicks(50);
+        }
+        
+    }
+    
+        
+       
+    debug("ended setup");
+
+    
 }
 void loop()
 {
