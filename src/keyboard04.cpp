@@ -1,14 +1,23 @@
 #include <Arduino.h>
-#include <OneButton.h>
+#include <MIDI.h>
 
 #include <math.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG == 1
-#define debug(x) Serial.println(x)
+#define debug(x) Serial.print(x)
+#define debugln(x) Serial.println(x)
 #else
 #define debug(x)
+#define debugln(x)
 #endif 
+
+
+#include <MonoPlayer.h>
+#include <SequencerMono.h>
+#include <Button.h>
+USING_NAMESPACE_MIDI
+
 
 //  thats basic functionality for monophonyc keyboard
 //  it supports portamento as chromatic and linear with variable resolution to avchieve arpeggiated effects
@@ -44,19 +53,10 @@ uint8_t octaveShift = 1;
 unsigned long currentTime;
 
 // this class plays without portamento
-#include <MonoPlayer.h>
 
-#include <SequencerMono.h>
 MonoPlayer *pMonoPlayer = new MonoPlayer();
+Button *keys = new Button[44];
 
-
-
-
-OneButton keys[44];
-
-// MonoPlayer pMonoPlayer;
-//  reads out the matrix and stores it to keysPressed[]
-//  also number of frequencyChart pressed
 
 void ReadLoop()
 {    
@@ -66,24 +66,28 @@ void ReadLoop()
         for (uint8_t j = 0; j < 8; j++)
         {
             uint8_t key = i * 8 + j;
-            keys[key].tick();
-            debug("tick");
+            if ((key>4) && (key<50)) keys[key].tick();
+            
         }
         digitalWrite(outPins[i], HIGH);
     }
 }
 
-void _OnKeyPress(void   * arg){
-    pMonoPlayer->onKeyPress(*(uint8_t*)arg);
+//wrappers
+void _OnKeyPress(uint8_t    arg){
+    
+    pMonoPlayer->onKeyPress(arg);
+    
 }
-void _OnKeyRelease(void   * arg){
-    pMonoPlayer->onKeyRelease(*(uint8_t*)arg);
+void _OnKeyRelease(uint8_t    arg){
+    pMonoPlayer->onKeyRelease(arg);
+    
 }
 void setup()
 {   
     Serial.begin(9600);
-    Serial.print("hawooo   ");
-    debug("Started setup");
+    
+    debugln("Started setup");
     pinMode(outputPin, OUTPUT);
     digitalWrite(outputPin, LOW);
    
@@ -103,18 +107,18 @@ void setup()
         for (uint8_t j = 0; j < 8; j++)
         {
             uint8_t key = i * 8 + j;
-            keys[key] = OneButton(j, true, true);
+            keys[key].assignPin(inPins[j]);
 
-            keys[key].attachLongPressStart( _OnKeyPress, &key);
-            keys[key].attachLongPressStop( _OnKeyRelease, &key);
-            keys[key].setPressTicks(50);
+            keys[key].attachOnPress( _OnKeyPress, key);
+            keys[key].attachOnRelease( _OnKeyRelease, key);
+            
         }
         
     }
     
         
        
-    debug("ended setup");
+    debugln("ended setup");
 
     
 }

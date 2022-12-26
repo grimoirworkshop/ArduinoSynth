@@ -116,7 +116,7 @@ public:
 
     void onKeyRelease(uint8_t key)
     {
-        deleteFromArray(key);
+        deleteFromArray(key + 12*(octaveShift+2));
         if (keysPressed[0] == 0)
         {
             stop();
