@@ -5,8 +5,8 @@ class MonoPlayer
 private:
     float currentFr;
     uint16_t goalFr;
-    uint8_t keyPlayed;
-    uint8_t currentKey; // thats for use in chromatic portamento
+    byte keyPlayed;
+    byte currentKey; // thats for use in chromatic portamento
     float step;
     unsigned long portamentoPrevTime;
     enum
@@ -21,8 +21,8 @@ private:
     bool chromaticPortamento;
     bool playFromMIDI;
     bool sendMIDI;
-    uint8_t MIDIchannel;
-    uint8_t keysPressed[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    byte MIDIchannel ;
+    byte keysPressed[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
     uint16_t frequencyCalc(uint8_t key)
     {
@@ -36,9 +36,9 @@ public:
         playFromMIDI = false;
         sendMIDI = false;
         portamento = 0;
-        portamentoTickTime = 50;
+        portamentoTickTime = 70;
         chromaticPortamento = false;
-        
+        MIDIchannel = 1;
         states = silent;
     };
     
@@ -72,7 +72,9 @@ public:
     void onKeyPress(uint8_t key)
     {
         addToArray(key + 12*(octaveShift+2));
+        
         onNewKey(key+12*(octaveShift+2), 1.0);
+        MIDIsendNoteOn(key + 12*(octaveShift+2), 127, MIDIchannel);
     }
     void addToArray(uint8_t key)
     {
@@ -132,6 +134,7 @@ public:
                 }
             }
         }
+        MIDIsendNoteOn(byte(key + 12*(octaveShift+2)), 0, MIDIchannel);
     }
     void setPortamento(uint8_t key)
     {

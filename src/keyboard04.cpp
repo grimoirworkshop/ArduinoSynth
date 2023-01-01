@@ -1,7 +1,9 @@
 #include <Arduino.h>
-#include <MIDI.h>
 
-#include <math.h>
+
+#include <functionPrototypes.h>
+
+
 
 #define DEBUG 0
 #if DEBUG == 1
@@ -13,10 +15,6 @@
 #endif 
 
 
-#include <MonoPlayer.h>
-#include <SequencerMono.h>
-#include <Button.h>
-USING_NAMESPACE_MIDI
 
 
 //  thats basic functionality for monophonyc keyboard
@@ -28,65 +26,32 @@ USING_NAMESPACE_MIDI
 //  cv out
 //  record and play sequences, ideally to external clock, should probably do as interrupt
 
-//uint16_t frequencyChart[97];
 
 // Setting the pins for scanning matrix and I/O
 uint8_t outPins[] = {8, 7, 6, 5, 4, 3, 2};
 uint8_t inPins[] = {9, 10, 11, 12, 14, 15, 16, 17};
 const int outputPin = 13;
-
-// chrPortaKey used for chromatic portamento
-uint8_t numKeysPressed, pNumKeysPressed, chrPortaKey;
-
-// Arrays that store all frequencyChart pressed in current and previous reading, empty keysPressed elements are zeros. PKeysPressed has frequencyChart sorted in it chronologically, with most recent key having greater index
-// int keysPressed[8], PKeysPressed[8];
-
-// portamento to be set as analog in: for now its const. 0 for no portamento
-int portamentoMillis = 0;
-// portaRes is resolution in millis for arpeggiated effects; set to 1 for no effect. also shoul be read from analog input
-int portaRes = 20;
-
-// set to true to go through a chromatic and false to go linearly through frequencies; will immideately play a half-tone without delay
-bool chrPorta = true;
+uint8_t numKeysPressed, pNumKeysPressed;
 uint8_t octaveShift = 1;
-
 unsigned long currentTime;
 
-// this class plays without portamento
+
+#include <MonoPlayer.h>
+#include <SequencerMono.h>
+#include <Button.h>
+
 
 MonoPlayer *pMonoPlayer = new MonoPlayer();
 Button *keys = new Button[44];
 
 
-void ReadLoop()
-{    
-    for (uint8_t i = 0; i < 7; i++)
-    {
-        digitalWrite(outPins[i], LOW);
-        for (uint8_t j = 0; j < 8; j++)
-        {
-            uint8_t key = i * 8 + j;
-            if ((key>4) && (key<50)) keys[key].tick();
-            
-        }
-        digitalWrite(outPins[i], HIGH);
-    }
-}
 
-//wrappers
-void _OnKeyPress(uint8_t    arg){
-    
-    pMonoPlayer->onKeyPress(arg);
-    
-}
-void _OnKeyRelease(uint8_t    arg){
-    pMonoPlayer->onKeyRelease(arg);
-    
-}
+
 void setup()
 {   
     Serial.begin(9600);
-    
+    while (!Serial);
+     
     debugln("Started setup");
     pinMode(outputPin, OUTPUT);
     digitalWrite(outputPin, LOW);
@@ -128,3 +93,41 @@ void loop()
     pMonoPlayer->portamentoTick();
 }
 
+void ReadLoop( )
+{    
+    for (uint8_t i = 0; i < 7; i++)
+    {
+        digitalWrite(outPins[i], LOW);
+        for (uint8_t j = 0; j < 8; j++)
+        {
+            uint8_t key = i * 8 + j;
+            if ((key>4) && (key<50)) keys[key].tick();
+            
+        }
+        digitalWrite(outPins[i], HIGH);
+    }
+}
+
+
+void MIDIsendNoteOn(byte note, byte velocity, byte channel ){
+Serial.write(144);
+Serial.write(note);
+Serial.write(velocity);
+
+}
+
+//wrappers
+
+void _OnKeyPress(uint8_t    arg){
+    
+    pMonoPlayer->onKeyPress(arg);
+    
+}
+void _OnKeyRelease(uint8_t    arg){
+    pMonoPlayer->onKeyRelease(arg);
+    
+}
+
+
+
+#include <functions.h>
